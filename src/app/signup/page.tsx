@@ -37,7 +37,7 @@ export default function SignUpPage() {
         data: {
           full_name: name,
         },
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
 

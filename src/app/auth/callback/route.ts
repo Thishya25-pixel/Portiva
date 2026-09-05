@@ -3,18 +3,27 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/reset-password";
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+  const code = searchParams.get("code");
+  const next = searchParams.get("next") || "/dashboard";
+
+  if (!code) {
+    return NextResponse.redirect(
+      `${origin}/login?error=Missing%20authentication%20code`
+    );
   }
 
-  // Return the user to login with an error if code exchange fails
-  return NextResponse.redirect(`${origin}/login?error=Could%20not%20authenticate`);
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    console.error("Auth callback error:", error.message);
+
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  return NextResponse.redirect(`${origin}${next}`);
 }

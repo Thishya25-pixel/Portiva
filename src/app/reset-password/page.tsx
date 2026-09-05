@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import AuthLayout from "@/components/AuthLayout";
@@ -8,8 +8,29 @@ import AuthLayout from "@/components/AuthLayout";
 export default function ResetPasswordPage() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const router = useRouter();
+
+  useEffect(() => {
+    async function checkSession() {
+      const supabase = createClient();
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setMessage(
+          "Your password reset link is invalid or has expired. Please request a new one."
+        );
+      }
+
+      setCheckingSession(false);
+    }
+
+    checkSession();
+  }, []);
 
   async function handleUpdatePassword(
     event: FormEvent<HTMLFormElement>
@@ -48,40 +69,48 @@ export default function ResetPasswordPage() {
       title="Create a new password"
       subtitle="Choose a strong password to keep your Portiva account secure."
     >
-      <form onSubmit={handleUpdatePassword} className="space-y-5">
-        <div>
-          <label
-            htmlFor="password"
-            className="mb-2 block text-sm font-medium text-slate-200"
-          >
-            New password
-          </label>
+      {checkingSession ? (
+        <p className="text-sm text-slate-400">
+          Verifying your reset link...
+        </p>
+      ) : (
+        <form onSubmit={handleUpdatePassword} className="space-y-5">
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-slate-200"
+            >
+              New password
+            </label>
 
-          <input
-            id="password"
-            name="password"
-            type="password"
-            minLength={6}
-            required
-            placeholder="At least 6 characters"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-          />
-        </div>
-
-        {message && (
-          <div className="rounded-xl border border-slate-700 bg-white/5 px-4 py-3 text-sm text-slate-300">
-            {message}
+            <input
+              id="password"
+              name="password"
+              type="password"
+              minLength={6}
+              required
+              placeholder="At least 6 characters"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+            />
           </div>
-        )}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-        >
-          {isSubmitting ? "Updating password..." : "Update password →"}
-        </button>
-      </form>
+          {message && (
+            <div className="rounded-xl border border-slate-700 bg-white/5 px-4 py-3 text-sm text-slate-300">
+              {message}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+          >
+            {isSubmitting
+              ? "Updating password..."
+              : "Update password →"}
+          </button>
+        </form>
+      )}
     </AuthLayout>
   );
 }
