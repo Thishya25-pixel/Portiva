@@ -1,4 +1,4 @@
-// proxy.ts or middleware.ts
+// src/proxy.ts
 import { NextResponse, type NextRequest } from "next/server";
 
 const PLATFORM_ROUTES = [
@@ -12,23 +12,28 @@ const PLATFORM_ROUTES = [
   "/auth",
 ];
 
-export default function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") || "";
-  const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "localhost";
+  
+  // Read private server variable and strip any leading protocols if present
+  const rawDomain = process.env.MAIN_DOMAIN || "portiva.online";
+  const MAIN_DOMAIN = rawDomain.replace(/^https?:\/\//, "");
 
   const currentHost = hostname.split(":")[0];
   const baseDomain = MAIN_DOMAIN.split(":")[0];
   const pathname = request.nextUrl.pathname;
 
-  // Never rewrite platform routes or static assets
-  const isPlatformRoute = PLATFORM_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  // Let static assets & platform routes pass through directly
+  const isPlatformRoute = PLATFORM_ROUTES.some((route) => {
+    if (route === "/") return pathname === "/";
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
 
   if (isPlatformRoute) {
     return NextResponse.next();
   }
 
+  // Subdomain check
   const isSubdomain =
     currentHost !== baseDomain &&
     currentHost !== "localhost" &&
@@ -37,6 +42,7 @@ export default function proxy(request: NextRequest) {
 
   if (isSubdomain) {
     const subdomain = currentHost.replace(`.${baseDomain}`, "");
+
     if (subdomain && subdomain !== "www") {
       const url = request.nextUrl;
       const targetPath =
