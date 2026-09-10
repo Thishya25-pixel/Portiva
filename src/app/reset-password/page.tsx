@@ -16,34 +16,23 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    // 1. Check existing session first
-    async function initSession() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+    // Listen for the PASSWORD_RECOVERY event or existing active session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "PASSWORD_RECOVERY" || session) {
+          setMessage("");
           setCheckingSession(false);
-          return;
+        } else if (event === "SIGNED_OUT") {
+          setMessage("Your reset link is invalid or expired.");
+          setCheckingSession(false);
+        } else {
+          // Keep checking until auth initializes
+          setCheckingSession(false);
         }
-      } catch (err) {
-        console.error("Session fetch error:", err);
       }
+    );
 
-      // 2. Fallback listener for auth state change
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (event, session) => {
-          if (event === "PASSWORD_RECOVERY" || session) {
-            setCheckingSession(false);
-          } else {
-            setMessage("Your reset link is invalid or expired.");
-            setCheckingSession(false);
-          }
-        }
-      );
-
-      return () => subscription.unsubscribe();
-    }
-
-    initSession();
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleUpdatePassword(event: FormEvent<HTMLFormElement>) {
@@ -68,7 +57,7 @@ export default function ResetPasswordPage() {
     setTimeout(() => {
       router.push("/dashboard");
       router.refresh();
-    }, 1000);
+    }, 1200);
   }
 
   return (
