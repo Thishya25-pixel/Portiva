@@ -1,3 +1,4 @@
+// app/reset-password/page.tsx
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -11,43 +12,32 @@ export default function ResetPasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
-    async function checkSession() {
-      const supabase = createClient();
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        setMessage(
-          "Your password reset link is invalid or has expired. Please request a new one."
-        );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "PASSWORD_RECOVERY" || session) {
+          setCheckingSession(false);
+        } else {
+          setMessage("Your password reset link is invalid or expired.");
+          setCheckingSession(false);
+        }
       }
+    );
 
-      setCheckingSession(false);
-    }
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
-    checkSession();
-  }, []);
-
-  async function handleUpdatePassword(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleUpdatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setIsSubmitting(true);
     setMessage("");
 
     const formData = new FormData(event.currentTarget);
     const password = formData.get("password") as string;
 
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
+    const { error } = await supabase.auth.updateUser({ password });
 
     setIsSubmitting(false);
 
@@ -57,7 +47,6 @@ export default function ResetPasswordPage() {
     }
 
     setMessage("Password updated successfully!");
-
     setTimeout(() => {
       router.push("/dashboard");
       router.refresh();
@@ -70,19 +59,13 @@ export default function ResetPasswordPage() {
       subtitle="Choose a strong password to keep your Portiva account secure."
     >
       {checkingSession ? (
-        <p className="text-sm text-slate-400">
-          Verifying your reset link...
-        </p>
+        <p className="text-sm text-slate-400">Verifying reset session...</p>
       ) : (
         <form onSubmit={handleUpdatePassword} className="space-y-5">
           <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-slate-200"
-            >
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-200">
               New password
             </label>
-
             <input
               id="password"
               name="password"
@@ -105,9 +88,7 @@ export default function ResetPasswordPage() {
             disabled={isSubmitting}
             className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           >
-            {isSubmitting
-              ? "Updating password..."
-              : "Update password →"}
+            {isSubmitting ? "Updating password..." : "Update password →"}
           </button>
         </form>
       )}
