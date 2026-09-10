@@ -35,18 +35,7 @@ export async function GET(request: Request) {
     },
   });
 
-  // Flow A: Standard PKCE Code Exchange
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return response;
-
-    console.error("PKCE Exchange Error:", error.message);
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`
-    );
-  }
-
-  // Flow B: OTP / Token Hash Verification (Preferred for Password Reset)
+  // Flow 1: OTP / Token Hash Verification (Check FIRST to bypass PKCE cookie reliance)
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type: type as any,
@@ -54,6 +43,18 @@ export async function GET(request: Request) {
     });
     if (!error) return response;
 
+    console.error("OTP Verification Error:", error.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  // Flow 2: Fallback PKCE Code Exchange
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return response;
+
+    console.error("PKCE Exchange Error:", error.message);
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
