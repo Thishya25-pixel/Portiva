@@ -11,19 +11,12 @@ export async function GET(request: Request) {
   const type = searchParams.get("type");
   const next = searchParams.get("next") || "/dashboard";
 
-  // Check both public keys and non-prefixed server fallbacks
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
   const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-
-  // Guard against missing deployment environment variables
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables on server.");
-    return NextResponse.redirect(
-      `${origin}/login?error=MissingSupabaseEnvKeys`
-    );
-  }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY!;
 
   const cookieStore = await cookies();
   const response = NextResponse.redirect(`${origin}${next}`);
@@ -35,24 +28,25 @@ export async function GET(request: Request) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
           response.cookies.set(name, value, options);
         });
       },
     },
   });
 
-  // Path 1: Standard PKCE Code Exchange
+  // Flow A: Standard PKCE Code Exchange
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
 
-    console.error("PKCE exchange error:", error.message);
+    console.error("PKCE Exchange Error:", error.message);
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
   }
 
-  // Path 2: Token Hash / OTP Verification (Reset Password & Email Confirmation)
+  // Flow B: OTP / Token Hash Verification (Preferred for Password Reset)
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type: type as any,
@@ -60,7 +54,6 @@ export async function GET(request: Request) {
     });
     if (!error) return response;
 
-    console.error("OTP verification error:", error.message);
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
