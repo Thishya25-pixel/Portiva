@@ -15,15 +15,15 @@ const PLATFORM_ROUTES = [
 export function proxy(request: NextRequest) {
   const hostname = request.headers.get("host") || "";
   
-  // Read private server variable and strip any leading protocols if present
+  // Strip www. if present so www.portiva.online behaves like portiva.online
+  const cleanHost = hostname.replace(/^www\./, "").split(":")[0];
+  
   const rawDomain = process.env.MAIN_DOMAIN || "portiva.online";
-  const MAIN_DOMAIN = rawDomain.replace(/^https?:\/\//, "");
-
-  const currentHost = hostname.split(":")[0];
-  const baseDomain = MAIN_DOMAIN.split(":")[0];
+  const baseDomain = rawDomain.replace(/^https?:\/\//, "").replace(/^www\./, "").split(":")[0];
+  
   const pathname = request.nextUrl.pathname;
 
-  // Let static assets & platform routes pass through directly
+  // Let platform routes pass through directly
   const isPlatformRoute = PLATFORM_ROUTES.some((route) => {
     if (route === "/") return pathname === "/";
     return pathname === route || pathname.startsWith(`${route}/`);
@@ -33,17 +33,17 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Subdomain check
+  // Subdomain check (ignoring www)
   const isSubdomain =
-    currentHost !== baseDomain &&
-    currentHost !== "localhost" &&
-    currentHost !== "127.0.0.1" &&
-    currentHost.endsWith(`.${baseDomain}`);
+    cleanHost !== baseDomain &&
+    cleanHost !== "localhost" &&
+    cleanHost !== "127.0.0.1" &&
+    cleanHost.endsWith(`.${baseDomain}`);
 
   if (isSubdomain) {
-    const subdomain = currentHost.replace(`.${baseDomain}`, "");
+    const subdomain = cleanHost.replace(`.${baseDomain}`, "");
 
-    if (subdomain && subdomain !== "www") {
+    if (subdomain) {
       const url = request.nextUrl;
       const targetPath =
         pathname === "/" ? `/${subdomain}` : `/${subdomain}${pathname}`;
