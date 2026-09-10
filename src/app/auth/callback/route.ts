@@ -11,13 +11,18 @@ export async function GET(request: Request) {
   const type = searchParams.get("type");
   const next = searchParams.get("next") || "/dashboard";
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Check both public keys and non-prefixed server fallbacks
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
   // Guard against missing deployment environment variables
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing Supabase environment variables on server.");
-    return NextResponse.redirect(`${origin}/login?error=MissingSupabaseEnvKeys`);
+    return NextResponse.redirect(
+      `${origin}/login?error=MissingSupabaseEnvKeys`
+    );
   }
 
   const cookieStore = await cookies();
@@ -36,20 +41,32 @@ export async function GET(request: Request) {
     },
   });
 
+  // Path 1: Standard PKCE Code Exchange
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+
+    console.error("PKCE exchange error:", error.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
   }
 
+  // Path 2: Token Hash / OTP Verification (Reset Password & Email Confirmation)
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type: type as any,
       token_hash: tokenHash,
     });
     if (!error) return response;
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+
+    console.error("OTP verification error:", error.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
   }
 
-  return NextResponse.redirect(`${origin}/login?error=MissingAuthenticationCode`);
+  return NextResponse.redirect(
+    `${origin}/login?error=MissingAuthenticationCode`
+  );
 }
