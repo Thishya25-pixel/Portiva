@@ -1,6 +1,8 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
+import "./globals.css"; // Adjust path to your CSS if needed
 
+// 1. Named export for metadata
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.portiva.online"),
   title: {
@@ -19,8 +21,6 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Portiva Team" }],
   creator: "Portiva",
-
-  // Open Graph / Facebook / LinkedIn Card Metadata
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -31,24 +31,20 @@ export const metadata: Metadata = {
     siteName: "Portiva",
     images: [
       {
-        url: "/og", // Recommended: 1200x630px image in your /public folder
+        url: "/og", // Points to your dynamic image route at src/app/og/route.tsx
         width: 1200,
         height: 630,
         alt: "Portiva Platform Preview",
       },
     ],
   },
-
-  // Twitter / X Card Metadata
   twitter: {
     card: "summary_large_image",
     title: "Portiva — Build & Launch Custom Portfolios in Minutes",
     description:
       "Turn your work into a client-winning online presence. Build and publish your custom platform in minutes.",
-    images: ["/og-image.png"],
+    images: ["/og"],
   },
-
-  // Browser Icons & PWA Metadata
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -57,3 +53,18 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png" }],
   },
 };
+
+// 2. REQUIRED: Default export for the layout component
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="antialiased bg-[#090d16] text-white">
+        {children}
+      </body>
+    </html>
+  );
+}
