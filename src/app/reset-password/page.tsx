@@ -1,4 +1,4 @@
-// app/reset-password/page.tsx
+// src/app/reset-password/page.tsx
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
@@ -15,12 +15,13 @@ export default function ResetPasswordPage() {
   const supabase = createClient();
 
   useEffect(() => {
+    // Listen for auth state changes specifically for recovery links
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (event === "PASSWORD_RECOVERY" || session) {
           setCheckingSession(false);
         } else {
-          setMessage("Your password reset link is invalid or expired.");
+          setMessage("Your reset link is invalid or expired. Please request a new one.");
           setCheckingSession(false);
         }
       }
