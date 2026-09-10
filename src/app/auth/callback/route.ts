@@ -11,49 +11,45 @@ export async function GET(request: Request) {
   const type = searchParams.get("type");
   const next = searchParams.get("next") || "/dashboard";
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Guard against missing deployment environment variables
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables on server.");
+    return NextResponse.redirect(`${origin}/login?error=MissingSupabaseEnvKeys`);
+  }
+
   const cookieStore = await cookies();
   const response = NextResponse.redirect(`${origin}${next}`);
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
 
-  // Path A: Standard PKCE Code Exchange
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`
-    );
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Path B: Token Hash Verification (Verification / Recovery Links)
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type: type as any,
       token_hash: tokenHash,
     });
     if (!error) return response;
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error.message)}`
-    );
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Path C: Missing code/token
-  return NextResponse.redirect(
-    `${origin}/login?error=Missing%20authentication%20code`
-  );
+  return NextResponse.redirect(`${origin}/login?error=MissingAuthenticationCode`);
 }
