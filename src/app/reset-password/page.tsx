@@ -12,23 +12,39 @@ export default function ResetPasswordPage() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    // Listen for auth state changes specifically for recovery links
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "PASSWORD_RECOVERY" || session) {
-          setCheckingSession(false);
-        } else {
-          setMessage("Your reset link is invalid or expired. Please request a new one.");
-          setCheckingSession(false);
-        }
-      }
-    );
+    const supabase = createClient();
 
-    return () => subscription.unsubscribe();
-  }, [supabase]);
+    // 1. Check existing session first
+    async function initSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setCheckingSession(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Session fetch error:", err);
+      }
+
+      // 2. Fallback listener for auth state change
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          if (event === "PASSWORD_RECOVERY" || session) {
+            setCheckingSession(false);
+          } else {
+            setMessage("Your reset link is invalid or expired.");
+            setCheckingSession(false);
+          }
+        }
+      );
+
+      return () => subscription.unsubscribe();
+    }
+
+    initSession();
+  }, []);
 
   async function handleUpdatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,6 +54,7 @@ export default function ResetPasswordPage() {
     const formData = new FormData(event.currentTarget);
     const password = formData.get("password") as string;
 
+    const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
 
     setIsSubmitting(false);
@@ -60,13 +77,19 @@ export default function ResetPasswordPage() {
       subtitle="Choose a strong password to keep your Portiva account secure."
     >
       {checkingSession ? (
-        <p className="text-sm text-slate-400">Verifying reset session...</p>
+        <div className="py-8 text-center text-sm text-slate-400">
+          Verifying your reset session...
+        </div>
       ) : (
         <form onSubmit={handleUpdatePassword} className="space-y-5">
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-200">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-slate-200"
+            >
               New password
             </label>
+
             <input
               id="password"
               name="password"

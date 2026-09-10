@@ -7,17 +7,11 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
 
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") || "/dashboard";
 
-  if (!code) {
-    return NextResponse.redirect(
-      `${origin}/login?error=Missing%20authentication%20code`
-    );
-  }
-
   const cookieStore = await cookies();
-
-  // Create redirect response target first
   const response = NextResponse.redirect(`${origin}${next}`);
 
   const supabase = createServerClient(
@@ -37,14 +31,29 @@ export async function GET(request: Request) {
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-  if (error) {
-    console.error("Auth callback error:", error.message);
+  // Path A: Standard PKCE Code Exchange
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return response;
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
   }
 
-  return response;
+  // Path B: Token Hash Verification (Verification / Recovery Links)
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({
+      type: type as any,
+      token_hash: tokenHash,
+    });
+    if (!error) return response;
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  // Path C: Missing code/token
+  return NextResponse.redirect(
+    `${origin}/login?error=Missing%20authentication%20code`
+  );
 }
