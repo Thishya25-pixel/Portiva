@@ -2,15 +2,15 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EditorClient from "./EditorClient";
 
-interface PageProps {
+export default async function EditorPage({
+  params,
+}: {
   params: Promise<{ websiteId: string }>;
-}
-
-export default async function EditorPage({ params }: PageProps) {
+}) {
   const { websiteId } = await params;
   const supabase = await createClient();
 
-  // 1. Verify Authentication
+  // 1. Authenticate User
   const {
     data: { user },
     error: authError,
@@ -20,30 +20,31 @@ export default async function EditorPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  // 2. Fetch target website owned by user
-  const { data: website, error: websiteError } = await supabase
+  // 2. Fetch Website Details
+  const { data: website, error: siteError } = await supabase
     .from("websites")
     .select("*")
     .eq("id", websiteId)
     .eq("user_id", user.id)
     .single();
 
-  if (websiteError || !website) {
+  if (siteError || !website) {
     notFound();
   }
 
-  // 3. Fetch website section contents
-  const { data: contentRows } = await supabase
+  // 3. Fetch All Content Sections for this Website
+  const { data: sections } = await supabase
     .from("website_content")
     .select("section, content")
     .eq("website_id", websiteId);
 
-  // Map array of rows into key-value object { hero: {...}, about: {...} }
+  // 4. Map Array of Sections into a Clean Key-Value Object
+  // e.g., { hero: { title: "..." }, about: { bio: "..." } }
   const initialContent: Record<string, any> = {};
-  if (contentRows) {
-    for (const row of contentRows) {
-      initialContent[row.section] = row.content;
-    }
+  if (sections) {
+    sections.forEach((item) => {
+      initialContent[item.section] = item.content;
+    });
   }
 
   return <EditorClient website={website} initialContent={initialContent} />;

@@ -150,49 +150,50 @@ export default function DashboardClient({
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="mb-3 flex items-center gap-2">
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-400">
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">
                           {site.category}
                         </span>
 
                         <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             site.published
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-amber-500/10 text-amber-400"
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                           }`}
                         >
                           {site.published ? "Published" : "Draft"}
                         </span>
                       </div>
 
-                      <h3 className="truncate text-xl font-semibold">
+                      <h3 className="truncate text-xl font-semibold text-white">
                         {site.name}
                       </h3>
 
-                      <p className="mt-2 truncate font-mono text-xs text-indigo-400">
-                       Your Portiva site · /{site.slug}
+                      <p className="mt-2 flex items-center gap-1.5 font-mono text-xs text-indigo-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        portiva.online/{site.slug}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-8 flex items-center gap-3">
-                    <Link
-                      href={`/editor/${site.id}`}
-                      className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-slate-200"
-                    >
-                      Edit website →
-                    </Link>
+                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/editor/${site.id}`}
+                        className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-slate-200"
+                      >
+                        Edit site →
+                      </Link>
 
-                    {site.published && (
                       <a
-  href={`/${site.slug}`}
-  target="_blank"
-  rel="noreferrer"
-  className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
->
-  View site ↗
-</a>
-                    )}
+                        href={`/${site.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                      >
+                        View ↗
+                      </a>
+                    </div>
                   </div>
                 </div>
               ))}

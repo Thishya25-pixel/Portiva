@@ -55,7 +55,7 @@ export default function ResetPasswordPage() {
 
     setMessage("Password updated successfully!");
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push("/login?message=PasswordUpdated");
       router.refresh();
     }, 1200);
   }

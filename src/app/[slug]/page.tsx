@@ -6,40 +6,10 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-// Dynamic SEO metadata generation
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: website, error } = await supabase
-  .from("websites")
-  .select("*")
-  .eq("slug", slug)
-  .eq("published", true)
-  .maybeSingle();
-
-if (error) {
-  // Log message and details explicitly instead of logging the raw error object
-  console.error("Supabase Query Error:", error.message, error.details);
-}
-
-  if (!website) {
-    return {
-      title: "Page Not Found",
-    };
-  }
-
-  return {
-    title: `${website.name} | ${website.category}`,
-    description: `Official website of ${website.name}.`,
-  };
-}
-
-export default async function PublicWebsitePage({ params }: PageProps) {
-  const { slug } = await params;
-  const supabase = await createClient();
-
-  // 1. Fetch published website by slug
   const { data: website } = await supabase
     .from("websites")
     .select("*")
@@ -47,25 +17,44 @@ export default async function PublicWebsitePage({ params }: PageProps) {
     .eq("published", true)
     .maybeSingle();
 
-  // If site doesn't exist or isn't published, return 404
   if (!website) {
-  return (
-    <div className="p-10 text-white bg-slate-950 font-mono">
-      <h1>Debug Info</h1>
-      <p>Target Slug: <strong>{slug}</strong></p>
-      <p>Website returned from Supabase: <strong>null</strong></p>
-      <p>Check RLS policies or published status in your Supabase table.</p>
-    </div>
-  );
+    return {
+      title: "Portfolio Not Found | Portiva",
+    };
+  }
+
+  return {
+    title: `${website.name} | ${website.category}`,
+    description: `Official website of ${website.name}. Built on Portiva.`,
+  };
 }
 
-  // 2. Fetch section contents for this website
+export default async function PublicWebsitePage({ params }: PageProps) {
+  const { slug } = await params;
+  const supabase = await createClient();
+
+  // 1. Fetch published website
+  const { data: website, error } = await supabase
+    .from("websites")
+    .select("*")
+    .eq("slug", slug)
+    .eq("published", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching public website:", error.message);
+  }
+
+  if (!website) {
+    notFound();
+  }
+
+  // 2. Fetch section content rows
   const { data: contentRows } = await supabase
     .from("website_content")
     .select("section, content")
     .eq("website_id", website.id);
 
-  // Reconstruct sections into key-value map
   const content: Record<string, any> = {};
   if (contentRows) {
     for (const row of contentRows) {
@@ -75,34 +64,51 @@ export default async function PublicWebsitePage({ params }: PageProps) {
 
   const hero = content.hero || {
     title: website.name,
-    subtitle: "Welcome to my website.",
+    subtitle: "Welcome to my official website.",
     ctaText: "Get in touch",
   };
   const about = content.about || { bio: "" };
+  const projects = content.projects || { heading: "Featured Work", items: [] };
   const skillsList: string[] = content.skills?.list || [];
   const contact = content.contact || {};
 
-  const primaryColor = website.theme_config?.primaryColor || "#2563eb"; // Fallback to blue-600
+  const primaryColor = website.theme_config?.primaryColor || "#6366f1";
+  const fontFamily = website.theme_config?.fontFamily || "sans";
+
+  const fontClass =
+    fontFamily === "serif"
+      ? "font-serif"
+      : fontFamily === "mono"
+      ? "font-mono"
+      : "font-sans";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500 selection:text-white">
-      {/* Dynamic Theme Color Injected via CSS Variables */}
+    <div
+      className={`min-h-screen bg-[#080b12] text-slate-100 ${fontClass} selection:bg-indigo-500 selection:text-white`}
+    >
       <style>{`
         :root {
           --brand-primary: ${primaryColor};
         }
       `}</style>
 
-      {/* Header / Navbar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#080b12]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <a href="#" className="text-lg font-bold tracking-tight text-white hover:opacity-90">
             {website.name}
           </a>
           <nav className="flex items-center gap-6 text-sm font-medium text-slate-400">
-            <a href="#about" className="transition hover:text-white">
-              About
-            </a>
+            {about.bio && (
+              <a href="#about" className="transition hover:text-white">
+                About
+              </a>
+            )}
+            {projects.items?.length > 0 && (
+              <a href="#projects" className="transition hover:text-white">
+                Projects
+              </a>
+            )}
             {skillsList.length > 0 && (
               <a href="#skills" className="transition hover:text-white">
                 Skills
@@ -116,35 +122,44 @@ export default async function PublicWebsitePage({ params }: PageProps) {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-24 px-6 py-16">
-        {/* Hero Section */}
-        <section className="flex flex-col items-center text-center space-y-6 pt-8">
-          <div className="inline-block rounded-full bg-slate-800/80 px-3.5 py-1 text-xs font-semibold text-slate-300 border border-slate-700">
+        {/* Hero */}
+        <section className="relative flex flex-col items-center text-center space-y-6 pt-8">
+          <div
+            className="pointer-events-none absolute -top-10 left-1/2 -z-10 h-64 w-64 -translate-x-1/2 rounded-full opacity-20 blur-3xl"
+            style={{ backgroundColor: "var(--brand-primary)" }}
+          />
+
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-1.5 text-xs font-semibold text-slate-300 border border-white/10">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             {website.category}
           </div>
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white max-w-3xl leading-tight">
+
+          <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight text-white max-w-3xl leading-[1.1]">
             {hero.title}
           </h1>
+
           {hero.subtitle && (
-            <p className="text-lg sm:text-xl text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-lg sm:text-xl text-slate-400 max-w-2xl leading-relaxed">
               {hero.subtitle}
             </p>
           )}
+
           {hero.ctaText && (
             <div className="pt-2">
               <a
                 href="#contact"
-                className="inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-xl px-7 py-3.5 text-sm font-semibold text-white shadow-xl transition hover:opacity-90"
                 style={{ backgroundColor: "var(--brand-primary)" }}
               >
-                {hero.ctaText}
+                {hero.ctaText} →
               </a>
             </div>
           )}
         </section>
 
-        {/* About Section */}
+        {/* About */}
         {about.bio && (
-          <section id="about" className="scroll-mt-24 space-y-4 border-t border-slate-800/80 pt-16">
+          <section id="about" className="scroll-mt-24 space-y-4 border-t border-white/10 pt-16">
             <h2 className="text-2xl font-bold tracking-tight text-white">About</h2>
             <p className="text-slate-300 text-base leading-relaxed whitespace-pre-line max-w-3xl">
               {about.bio}
@@ -152,15 +167,44 @@ export default async function PublicWebsitePage({ params }: PageProps) {
           </section>
         )}
 
-        {/* Skills Section */}
+        {/* Projects */}
+        {projects.items?.length > 0 && (
+          <section id="projects" className="scroll-mt-24 space-y-6 border-t border-white/10 pt-16">
+            <h2 className="text-2xl font-bold tracking-tight text-white">
+              {projects.heading || "Featured Work"}
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {projects.items.map((project: any, i: number) => (
+                <a
+                  key={i}
+                  href={project.url || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group rounded-2xl border border-white/10 bg-white/5 p-6 transition hover:border-indigo-500/50 hover:bg-white/10"
+                >
+                  <h3 className="font-bold text-white text-base group-hover:text-indigo-400 transition">
+                    {project.title}
+                  </h3>
+                  {project.description && (
+                    <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                      {project.description}
+                    </p>
+                  )}
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Skills */}
         {skillsList.length > 0 && (
-          <section id="skills" className="scroll-mt-24 space-y-4 border-t border-slate-800/80 pt-16">
+          <section id="skills" className="scroll-mt-24 space-y-4 border-t border-white/10 pt-16">
             <h2 className="text-2xl font-bold tracking-tight text-white">Skills & Expertise</h2>
             <div className="flex flex-wrap gap-2.5 pt-2">
               {skillsList.map((skill, index) => (
                 <span
                   key={index}
-                  className="rounded-lg bg-slate-900 border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-200"
+                  className="rounded-xl bg-white/5 border border-white/10 px-4 py-2 text-xs font-semibold text-slate-200"
                 >
                   {skill}
                 </span>
@@ -169,8 +213,8 @@ export default async function PublicWebsitePage({ params }: PageProps) {
           </section>
         )}
 
-        {/* Contact Section */}
-        <section id="contact" className="scroll-mt-24 space-y-6 border-t border-slate-800/80 pt-16 pb-12">
+        {/* Contact */}
+        <section id="contact" className="scroll-mt-24 space-y-6 border-t border-white/10 pt-16 pb-12">
           <div className="space-y-2">
             <h2 className="text-2xl font-bold tracking-tight text-white">Get in Touch</h2>
             <p className="text-sm text-slate-400">Feel free to connect or reach out directly.</p>
@@ -180,7 +224,7 @@ export default async function PublicWebsitePage({ params }: PageProps) {
             {contact.email && (
               <a
                 href={`mailto:${contact.email}`}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/90 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
               >
                 <span>📧</span> {contact.email}
               </a>
@@ -190,7 +234,7 @@ export default async function PublicWebsitePage({ params }: PageProps) {
                 href={contact.linkedin}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/90 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
               >
                 <span>🔗</span> LinkedIn Profile
               </a>
@@ -200,7 +244,7 @@ export default async function PublicWebsitePage({ params }: PageProps) {
                 href={contact.github}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/90 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
               >
                 <span>💻</span> GitHub Profile
               </a>
@@ -210,8 +254,16 @@ export default async function PublicWebsitePage({ params }: PageProps) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-8 text-center text-xs text-slate-500">
-        <p>© {new Date().getFullYear()} {website.name}. Powered by SaaS Builder.</p>
+      <footer className="border-t border-white/10 bg-[#080b12] py-8 text-center text-xs text-slate-500">
+        <p>
+          © {new Date().getFullYear()} {website.name} · Powered by{" "}
+          <a
+            href="https://www.portiva.online"
+            className="font-semibold text-indigo-400 hover:underline"
+          >
+            Portiva
+          </a>
+        </p>
       </footer>
     </div>
   );
