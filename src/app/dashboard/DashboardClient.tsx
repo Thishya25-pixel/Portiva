@@ -13,6 +13,55 @@ export default function DashboardClient({
   initialWebsites: any[];
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+
+    try {
+      const res = await fetch("/api/checkout/instamojo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan: "pro_monthly",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(
+          "Error initializing checkout: " +
+            (data.error || "Please try again.")
+        );
+        setUpgrading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Checkout error occurred.");
+      setUpgrading(false);
+    }
+  }
+
+  function handleNewWebsiteClick() {
+    // Free users are restricted to 1 active site
+    if (!user?.is_pro && initialWebsites.length >= 1) {
+      if (
+        confirm(
+          "Free plan limit reached (1 website). Upgrade to Pro for unlimited websites?"
+        )
+      ) {
+        handleUpgrade();
+      }
+      return;
+    }
+
+    setIsModalOpen(true);
+  }
 
   const firstName =
     user.user_metadata?.full_name?.split(" ")[0] ||
@@ -41,8 +90,18 @@ export default function DashboardClient({
           </Link>
 
           <div className="flex items-center gap-3">
+            {/* Upgrade button */}
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleUpgrade}
+              disabled={upgrading}
+              className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
+            </button>
+
+            {/* New website */}
+            <button
+              onClick={handleNewWebsiteClick}
               className="hidden rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 sm:block"
             >
               + New website
@@ -109,7 +168,7 @@ export default function DashboardClient({
             </div>
 
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleNewWebsiteClick}
               className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-slate-200"
             >
               + Create website
@@ -133,7 +192,7 @@ export default function DashboardClient({
               </p>
 
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={handleNewWebsiteClick}
                 className="mt-6 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
               >
                 Create your first website →
@@ -157,8 +216,8 @@ export default function DashboardClient({
                         <span
                           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             site.published
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                              : "border border-amber-500/20 bg-amber-500/10 text-amber-400"
                           }`}
                         >
                           {site.published ? "Published" : "Draft"}
@@ -170,7 +229,7 @@ export default function DashboardClient({
                       </h3>
 
                       <p className="mt-2 flex items-center gap-1.5 font-mono text-xs text-indigo-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
                         portiva.online/{site.slug}
                       </p>
                     </div>
