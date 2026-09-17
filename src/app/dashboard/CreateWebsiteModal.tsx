@@ -73,14 +73,19 @@ export default function CreateWebsiteModal({
       const data = await res.json();
 
       if (data.comingSoon) {
-        setNotice(data.message);
+        setNotice(
+          data.message ||
+            "Pro Subscriptions are opening shortly as payment gateways complete final setup!"
+        );
       } else if (data.url) {
         window.location.href = data.url;
       } else {
         setNotice("Something went wrong. Please try again later.");
       }
     } catch (err) {
-      setNotice("Pro plan upgrades are currently opening soon!");
+      setNotice(
+        "Pro Subscriptions are opening shortly as payment gateways complete final setup!"
+      );
     } finally {
       setUpgradeLoading(false);
     }
@@ -88,6 +93,7 @@ export default function CreateWebsiteModal({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+
     setLoading(true);
     setError("");
     setNotice(null);
@@ -111,7 +117,9 @@ export default function CreateWebsiteModal({
         .maybeSingle();
 
       if (existing) {
-        setError("This URL slug is already taken. Please pick another one.");
+        setError(
+          "This URL slug is already taken. Please pick another one."
+        );
         setLoading(false);
         return;
       }
@@ -269,9 +277,7 @@ export default function CreateWebsiteModal({
           {/* Coming Soon Notice */}
           {notice && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
-              🚀{" "}
-              <strong>Coming Soon:</strong> Pro Subscriptions are opening
-              shortly as payment gateways complete final setup!
+              🚀 <strong>Coming Soon:</strong> {notice}
             </div>
           )}
 
