@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // FIXED: Using API v1.1 endpoint for Private Key & Auth Token headers
+    // Using API v1.1 endpoint for Private Key & Auth Token headers
     const response = await fetch(
       "https://www.instamojo.com/api/1.1/payment-requests/",
       {
@@ -51,9 +51,10 @@ export async function POST(request: Request) {
     const data = await response.json();
     console.log("INSTAMOJO RESPONSE:", data);
 
-    // Profile under compliance review
+    // Account pending, invalid key header, or payment gateway not enabled
     if (
       response.status === 403 ||
+      response.status === 401 ||
       !data.success ||
       data.message?.toLowerCase()?.includes("not enabled")
     ) {
@@ -69,17 +70,25 @@ export async function POST(request: Request) {
 
     // Successful payment link generation
     if (data.payment_request?.longurl) {
-      return NextResponse.json({ url: data.payment_request.longurl });
+      return NextResponse.json({
+        url: data.payment_request.longurl,
+      });
     }
 
     return NextResponse.json(
-      { error: "Unable to initiate payment", details: data },
+      {
+        error: "Unable to initiate payment",
+        details: data,
+      },
       { status: 400 }
     );
   } catch (error: any) {
     console.error("CHECKOUT SERVER ERROR:", error);
+
     return NextResponse.json(
-      { error: error?.message || "Something went wrong" },
+      {
+        error: error?.message || "Something went wrong",
+      },
       { status: 500 }
     );
   }
