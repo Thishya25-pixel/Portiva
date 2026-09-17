@@ -1,8 +1,8 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
-import "./globals.css"; // Adjust path to your CSS if needed
+import "./globals.css";
+import Footer from "@/components/Footer";
 
-// 1. Named export for metadata
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.portiva.online"),
   title: {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "Portiva",
     images: [
       {
-        url: "/og", // Points to your dynamic image route at src/app/og/route.tsx
+        url: "/og",
         width: 1200,
         height: 630,
         alt: "Portiva Platform Preview",
@@ -54,7 +54,6 @@ export const metadata: Metadata = {
   },
 };
 
-// 2. REQUIRED: Default export for the layout component
 export default function RootLayout({
   children,
 }: {
@@ -64,6 +63,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased bg-[#090d16] text-white">
         {children}
+        <Footer />
       </body>
     </html>
   );
