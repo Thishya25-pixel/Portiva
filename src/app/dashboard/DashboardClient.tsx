@@ -13,50 +13,17 @@ export default function DashboardClient({
   initialWebsites: any[];
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
 
-  async function handleUpgrade() {
-    setUpgrading(true);
-
-    try {
-      const res = await fetch("/api/checkout/instamojo", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          plan: "pro_monthly",
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(
-          "Error initializing checkout: " +
-            (data.error || "Please try again.")
-        );
-        setUpgrading(false);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Checkout error occurred.");
-      setUpgrading(false);
-    }
+  function handleUpgrade() {
+    // Open the modal directly so the user sees the upgrade/coming-soon banner cleanly
+    setIsModalOpen(true);
   }
 
   function handleNewWebsiteClick() {
     // Free users are restricted to 1 active site
     if (!user?.is_pro && initialWebsites.length >= 1) {
-      if (
-        confirm(
-          "Free plan limit reached (1 website). Upgrade to Pro for unlimited websites?"
-        )
-      ) {
-        handleUpgrade();
-      }
+      // Open modal so they can see the limit & upgrade options
+      setIsModalOpen(true);
       return;
     }
 
@@ -93,10 +60,9 @@ export default function DashboardClient({
             {/* Upgrade button */}
             <button
               onClick={handleUpgrade}
-              disabled={upgrading}
-              className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-500/20"
             >
-              {upgrading ? "Opening checkout..." : "Upgrade to Pro"}
+              Upgrade to Pro
             </button>
 
             {/* New website */}
