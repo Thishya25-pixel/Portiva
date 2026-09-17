@@ -22,10 +22,10 @@ function slugify(input: string) {
   return input
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, "") // remove anything not alnum space hyphen
-    .replace(/\s+/g, "-") // spaces -> hyphens
-    .replace(/-+/g, "-") // collapse multiple hyphens
-    .replace(/^-|-$/g, ""); // trim hyphens
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export default function CreateWebsiteModal({
@@ -42,6 +42,8 @@ export default function CreateWebsiteModal({
   const [category, setCategory] = useState("Portfolio");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -50,20 +52,51 @@ export default function CreateWebsiteModal({
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     setName(value);
-
-    // Auto-generate slug from name
     setSlug(slugify(value));
+  }
+
+  async function handleUpgrade() {
+    setUpgradeLoading(true);
+    setNotice(null);
+
+    try {
+      const res = await fetch("/api/checkout/instamojo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan: "pro_monthly",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.comingSoon) {
+        setNotice(data.message);
+      } else if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setNotice("Something went wrong. Please try again later.");
+      }
+    } catch (err) {
+      setNotice("Pro plan upgrades are currently opening soon!");
+    } finally {
+      setUpgradeLoading(false);
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setNotice(null);
 
     try {
       const supabase = createClient();
 
       const finalSlug = slugify(slug || name);
+
       if (!finalSlug) {
         setError("Please enter a valid website name.");
         setLoading(false);
@@ -130,6 +163,7 @@ export default function CreateWebsiteModal({
         setLoading(false);
         return;
       }
+
       setLoading(false);
       onClose();
       router.refresh();
@@ -156,15 +190,21 @@ export default function CreateWebsiteModal({
             P
           </div>
 
-          <h2 className="text-xl font-semibold text-white">Create a new website</h2>
+          <h2 className="text-xl font-semibold text-white">
+            Create a new website
+          </h2>
 
-          <p className="mt-2 text-sm text-slate-400">Start building your online presence with Portiva.</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Start building your online presence with Portiva.
+          </p>
         </div>
 
         <form onSubmit={handleCreate} className="space-y-5">
           {/* Website Name */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-200">Website name</label>
+            <label className="mb-2 block text-sm font-medium text-slate-200">
+              Website name
+            </label>
 
             <input
               type="text"
@@ -178,7 +218,9 @@ export default function CreateWebsiteModal({
 
           {/* Slug */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-200">Website URL</label>
+            <label className="mb-2 block text-sm font-medium text-slate-200">
+              Website URL
+            </label>
 
             <div className="flex items-center rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
               <span className="whitespace-nowrap text-slate-500">/</span>
@@ -200,7 +242,9 @@ export default function CreateWebsiteModal({
 
           {/* Category */}
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-200">Category</label>
+            <label className="mb-2 block text-sm font-medium text-slate-200">
+              Category
+            </label>
 
             <select
               value={category}
@@ -222,6 +266,15 @@ export default function CreateWebsiteModal({
             </div>
           )}
 
+          {/* Coming Soon Notice */}
+          {notice && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+              🚀{" "}
+              <strong>Coming Soon:</strong> Pro Subscriptions are opening
+              shortly as payment gateways complete final setup!
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
@@ -239,6 +292,24 @@ export default function CreateWebsiteModal({
             >
               {loading ? "Creating..." : "Create website →"}
             </button>
+          </div>
+
+          {/* Upgrade */}
+          <div className="border-t border-white/10 pt-5">
+            <p className="mb-3 text-center text-xs text-slate-500">
+              Need more websites?
+            </p>
+
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUpgrade}
+                disabled={upgradeLoading}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {upgradeLoading ? "Checking..." : "Upgrade to Pro"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -1,111 +1,85 @@
-// src/app/api/checkout/instamojo/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
-    // 1. Authenticate Supabase user
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized access" },
-        { status: 401 }
-      );
-    }
+    console.log("=================================");
+    console.log("INSTAMOJO CHECKOUT STARTED");
+    console.log("=================================");
 
     const { plan } = await request.json();
-    const amount = plan === "pro_yearly" ? "2999" : "299";
-    const planName = plan === "pro_yearly" ? "Pro Yearly" : "Pro Monthly";
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.portiva.online";
+    const amount = plan === "pro_yearly" ? "2999.00" : "299.00";
 
-    const clientId = process.env.INSTAMOJO_CLIENT_ID;
-    const clientSecret = process.env.INSTAMOJO_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      console.error("Missing Instamojo Client ID or Client Secret in .env.local");
+    if (!process.env.INSTAMOJO_API_KEY || !process.env.INSTAMOJO_AUTH_TOKEN) {
       return NextResponse.json(
-        { error: "Payment gateway credentials missing" },
+        { error: "Instamojo credentials are missing." },
         { status: 500 }
       );
     }
 
-    // 2. Fetch OAuth2 Token (Instamojo v2 API)
-    const tokenParams = new URLSearchParams();
-    tokenParams.append("grant_type", "client_credentials");
-    tokenParams.append("client_id", clientId);
-    tokenParams.append("client_secret", clientSecret);
-
-    const tokenResponse = await fetch("https://api.instamojo.com/oauth2/token/", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: tokenParams,
-    });
-
-    const tokenData = await tokenResponse.json();
-
-    if (!tokenResponse.ok || !tokenData.access_token) {
-      console.error("Instamojo Auth Token Error:", tokenData);
+    if (!process.env.NEXT_PUBLIC_SITE_URL) {
       return NextResponse.json(
-        { error: tokenData.error_description || tokenData.error || "Authentication with Instamojo failed" },
-        { status: 400 }
+        { error: "NEXT_PUBLIC_SITE_URL is missing." },
+        { status: 500 }
       );
     }
 
-    const accessToken = tokenData.access_token;
-
-    // 3. Create Payment Request using v2 Endpoint & Bearer Token
-    const paymentParams = new URLSearchParams();
-    paymentParams.append("purpose", `Portiva ${planName} Plan`);
-    paymentParams.append("amount", amount);
-    paymentParams.append(
-      "buyer_name",
-      user.user_metadata?.full_name || user.email?.split("@")[0] || "Portiva Creator"
+    // FIXED: Using API v1.1 endpoint for Private Key & Auth Token headers
+    const response = await fetch(
+      "https://www.instamojo.com/api/1.1/payment-requests/",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Api-Key": process.env.INSTAMOJO_API_KEY,
+          "X-Auth-Token": process.env.INSTAMOJO_AUTH_TOKEN,
+        },
+        body: new URLSearchParams({
+          purpose: "Portiva Pro Subscription",
+          amount: amount,
+          buyer_name: "Portiva User",
+          email: "user@portiva.online",
+          phone: "9999999999",
+          redirect_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard?payment=success`,
+          webhook: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/instamojo`,
+          allow_repeated_payments: "False",
+        }),
+      }
     );
-    paymentParams.append("email", user.email || "");
-    paymentParams.append("send_email", "True");
-    paymentParams.append("redirect_url", `${siteUrl}/dashboard?payment=success`);
-    paymentParams.append("webhook", `${siteUrl}/api/webhooks/instamojo`);
 
-    const paymentResponse = await fetch("https://api.instamojo.com/v2/payment_requests/", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: paymentParams,
-    });
+    console.log("INSTAMOJO STATUS:", response.status);
 
-    const paymentData = await paymentResponse.json();
+    const data = await response.json();
+    console.log("INSTAMOJO RESPONSE:", data);
 
-    if (!paymentResponse.ok || paymentData.error) {
-      console.error("Instamojo Payment Request Error:", paymentData);
+    // Profile under compliance review
+    if (
+      response.status === 403 ||
+      !data.success ||
+      data.message?.toLowerCase()?.includes("not enabled")
+    ) {
       return NextResponse.json(
-        { error: paymentData.message || paymentData.error || "Failed to generate checkout link" },
-        { status: paymentResponse.status }
+        {
+          comingSoon: true,
+          message:
+            "Pro plan is coming soon! Payments are currently being activated.",
+        },
+        { status: 200 }
       );
     }
 
-    // Return the checkout link (v2 returns `longurl` inside payment_request object)
-    const longurl = paymentData.longurl || paymentData.payment_request?.longurl;
-
-    if (!longurl) {
-      console.error("No longurl returned in response:", paymentData);
-      return NextResponse.json(
-        { error: "Payment gateway did not return a valid URL" },
-        { status: 500 }
-      );
+    // Successful payment link generation
+    if (data.payment_request?.longurl) {
+      return NextResponse.json({ url: data.payment_request.longurl });
     }
 
-    return NextResponse.json({ url: longurl });
-  } catch (err: any) {
-    console.error("Instamojo Checkout Route Error:", err);
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: "Unable to initiate payment", details: data },
+      { status: 400 }
+    );
+  } catch (error: any) {
+    console.error("CHECKOUT SERVER ERROR:", error);
+    return NextResponse.json(
+      { error: error?.message || "Something went wrong" },
       { status: 500 }
     );
   }
