@@ -5,21 +5,34 @@ import DashboardClient from "./DashboardClient";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
+  // 1. Get logged-in user
   const {
     data: { user },
-    error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) {
+  if (!user) {
     redirect("/login");
   }
 
-  // Fetch websites owned by this user
+  // 2. Fetch user's profile for Pro status check
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  // 3. Fetch user's websites
   const { data: websites } = await supabase
     .from("websites")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  return <DashboardClient user={user} initialWebsites={websites || []} />;
+  return (
+    <DashboardClient
+      user={user}
+      profile={profile}
+      websites={websites || []}
+    />
+  );
 }
