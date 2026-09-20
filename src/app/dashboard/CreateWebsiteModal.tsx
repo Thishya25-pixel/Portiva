@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,10 +32,12 @@ export default function CreateWebsiteModal({
   isOpen,
   onClose,
   userId,
+  initialStep = "create",
 }: {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
+  initialStep?: "create" | "upi";
 }) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -47,7 +49,7 @@ export default function CreateWebsiteModal({
 
   // UPI state
   const [utr, setUtr] = useState("");
-  const [isUpiStep, setIsUpiStep] = useState(false);
+  const [isUpiStep, setIsUpiStep] = useState(initialStep === "upi");
   const [copied, setCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -55,6 +57,11 @@ export default function CreateWebsiteModal({
   const SECONDARY_UPI_ID = "8088477123@upi";
 
   const router = useRouter();
+
+  // Keep isUpiStep synchronized when initialStep prop changes
+  useEffect(() => {
+    setIsUpiStep(initialStep === "upi");
+  }, [initialStep]);
 
   if (!isOpen) return null;
 
@@ -118,9 +125,6 @@ export default function CreateWebsiteModal({
       }
 
       // Start a 24-hour trial immediately so the user isn't left waiting.
-      // An admin later reviews the UTR in /admin/payments and, if it
-      // checks out, upgrades this to a full 30-day Pro period (which also
-      // clears trial_ends_at) via AdminPaymentsClient's Approve action.
       const trialEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
       await supabase
