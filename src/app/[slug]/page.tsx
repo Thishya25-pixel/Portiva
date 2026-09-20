@@ -17,7 +17,7 @@ async function loadWebsite(slug: string) {
 
   const { data: website, error } = await supabase
     .from("websites")
-    .select("*, profiles:user_id(is_pro)")
+    .select("*, profiles:user_id(is_pro, pro_until, trial_ends_at)")
     .eq("slug", slug)
     .eq("published", true)
     .maybeSingle();
@@ -92,7 +92,32 @@ export default async function PublicWebsitePage({ params }: PageProps) {
   if (!result) notFound();
 
   const { website, content } = result;
-  const isPro = website.profiles?.is_pro ?? false;
+
+  // 1. Fetch user's profile with pro dates
+  const profile = website.profiles as {
+    is_pro?: boolean;
+    pro_until?: string | null;
+    trial_ends_at?: string | null;
+  } | null;
+
+  // 2. Validate Pro Status against Expiration Date
+  const isPro = (() => {
+    if (!profile?.is_pro) return false;
+
+    const now = new Date();
+
+    // Check if within 1-Month Pro Subscription
+    if (profile.pro_until) {
+      return new Date(profile.pro_until) > now;
+    }
+
+    // Check if within 24-Hour Instant Trial
+    if (profile.trial_ends_at) {
+      return new Date(profile.trial_ends_at) > now;
+    }
+
+    return true;
+  })();
 
   const sameAs = [
     content.contact.linkedin,
@@ -118,7 +143,6 @@ export default async function PublicWebsitePage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        // Values come from the site owner's own record, serialised as JSON.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <PortfolioView
