@@ -10,7 +10,8 @@ interface PageProps {
 }
 
 /** Serve sites fast; revalidate in the background */
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 async function loadWebsite(slug: string) {
   const supabase = await createClient();
