@@ -78,6 +78,9 @@ export async function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
+// Add default export for edge runtime bundler compatibility
+export default proxy;
+
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
