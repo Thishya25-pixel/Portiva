@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseDirect } from "@supabase/supabase-js";
 import PortfolioView, {
   normalizeContent,
 } from "@/components/portfolio/PortfolioView";
@@ -9,12 +9,16 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-/** Serve sites fast; revalidate in the background */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 async function loadWebsite(slug: string) {
-  const supabase = await createClient();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  const supabase = createSupabaseDirect(supabaseUrl, supabaseKey);
 
   // 1. Lookup published website by slug
   const { data: website, error } = await supabase
@@ -30,7 +34,7 @@ async function loadWebsite(slug: string) {
 
   if (!website) return null;
 
-  // 2. Lookup author's profile directly by user_id to reliably evaluate Pro status
+  // 2. Lookup author's profile directly (bypassing RLS so guest visitors read Pro status)
   const { data: profile } = await supabase
     .from("profiles")
     .select("is_pro, pro_until, trial_ends_at")
