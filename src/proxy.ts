@@ -7,7 +7,7 @@ export async function proxy(req: NextRequest) {
 
   const MAIN_DOMAIN = "portiva.online";
 
-  // 1. Skip system, static assets, and primary app routes
+  // Skip system routes, static assets, login, and dashboard pages
   if (
     url.pathname.startsWith("/_next") ||
     url.pathname.startsWith("/api") ||
@@ -33,7 +33,7 @@ export async function proxy(req: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 2. Handle Wildcard Subdomains (e.g. mytrail.portiva.online)
+  // 1. Custom Subdomain Routing (e.g. mytrail.portiva.online)
   if (
     hostname.endsWith(`.${MAIN_DOMAIN}`) &&
     !hostname.startsWith("www.") &&
@@ -44,22 +44,58 @@ export async function proxy(req: NextRequest) {
     // Fetch site matching custom_subdomain
     const { data: site } = await supabase
       .from("websites")
-      .select("slug, profiles:user_id(is_pro, pro_until, trial_ends_at)")
+      .select("slug, user_id")
       .eq("custom_subdomain", subdomain)
+      .eq("published", true)
       .maybeSingle();
 
-    const profile = (site as any)?.profiles;
-    const isPro = Boolean(
-      profile?.is_pro &&
-        ((profile.pro_until && new Date(profile.pro_until) > new Date()) ||
-          (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
-    );
+    if (site) {
+      // Direct lookup of author profile for Pro validation
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_pro, pro_until, trial_ends_at")
+        .eq("id", site.user_id)
+        .maybeSingle();
 
-    // If site exists and user is Pro, rewrite to public portfolio route
-    if (site && isPro) {
-      const rewriteUrl = new URL(`/${site.slug}${url.pathname}`, req.url);
-      // Strip authentication headers so auth middleware doesn't trigger a login redirect
-      return NextResponse.rewrite(rewriteUrl);
+      const isPro = Boolean(
+        profile?.is_pro &&
+          ((profile.pro_until && new Date(profile.pro_until) > new Date()) ||
+            (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
+      );
+
+      if (isPro) {
+        return NextResponse.rewrite(new URL(`/${site.slug}${url.pathname}`, req.url));
+      }
+    }
+  }
+
+  // 2. Custom Domain Routing (e.g. rahul.com)
+  if (!hostname.includes(MAIN_DOMAIN) && !hostname.includes("localhost")) {
+    const cleanDomain = hostname.replace("www.", "");
+
+    const { data: site } = await supabase
+      .from("websites")
+      .select("slug, user_id")
+      .eq("custom_domain", cleanDomain)
+      .eq("published", true)
+      .maybeSingle();
+
+    if (site) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_pro, pro_until, trial_ends_at")
+        .eq("id", site.user_id)
+        .maybeSingle();
+
+      const isPro = Boolean(
+        profile?.is_pro &&
+          ((profile.pro_until && new Date(profile.pro_until) > new Date()) ||
+            (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
+      );
+
+      if (isPro) {
+        return NextResponse.rewrite(new URL(`/${site.slug}${url.pathname}`, req.url));
+      }
     }
   }
 

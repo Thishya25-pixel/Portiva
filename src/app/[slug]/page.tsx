@@ -9,15 +9,16 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-/** Sites change rarely; serve them from cache and refresh in the background. */
+/** Serve sites fast; revalidate in the background */
 export const revalidate = 60;
 
 async function loadWebsite(slug: string) {
   const supabase = await createClient();
 
+  // 1. Lookup published website by slug
   const { data: website, error } = await supabase
     .from("websites")
-    .select("*, profiles:user_id(is_pro, pro_until, trial_ends_at)")
+    .select("*")
     .eq("slug", slug)
     .eq("published", true)
     .maybeSingle();
@@ -28,6 +29,14 @@ async function loadWebsite(slug: string) {
 
   if (!website) return null;
 
+  // 2. Lookup author's profile directly by user_id to reliably evaluate Pro status
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_pro, pro_until, trial_ends_at")
+    .eq("id", website.user_id)
+    .maybeSingle();
+
+  // 3. Lookup website content sections
   const { data: contentRows, error: contentError } = await supabase
     .from("website_content")
     .select("section, content")
@@ -42,7 +51,7 @@ async function loadWebsite(slug: string) {
     raw[row.section] = row.content;
   }
 
-  return { website, content: normalizeContent(raw, website.name) };
+  return { website, profile, content: normalizeContent(raw, website.name) };
 }
 
 export async function generateMetadata({
@@ -91,33 +100,14 @@ export default async function PublicWebsitePage({ params }: PageProps) {
 
   if (!result) notFound();
 
-  const { website, content } = result;
+  const { website, profile, content } = result;
 
-  // 1. Fetch user's profile with pro dates
-  const profile = website.profiles as {
-    is_pro?: boolean;
-    pro_until?: string | null;
-    trial_ends_at?: string | null;
-  } | null;
-
-  // 2. Validate Pro Status against Expiration Date
-  const isPro = (() => {
-    if (!profile?.is_pro) return false;
-
-    const now = new Date();
-
-    // Check if within 1-Month Pro Subscription
-    if (profile.pro_until) {
-      return new Date(profile.pro_until) > now;
-    }
-
-    // Check if within 24-Hour Instant Trial
-    if (profile.trial_ends_at) {
-      return new Date(profile.trial_ends_at) > now;
-    }
-
-    return true;
-  })();
+  // Validate active Pro status against Expiration Date / Active Trial
+  const isPro = Boolean(
+    profile?.is_pro &&
+      ((profile.pro_until && new Date(profile.pro_until) > new Date()) ||
+        (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
+  );
 
   const sameAs = [
     content.contact.linkedin,
@@ -143,8 +133,11 @@ export default async function PublicWebsitePage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd),
+        }}
       />
+
       <PortfolioView
         name={website.name}
         category={website.category}
