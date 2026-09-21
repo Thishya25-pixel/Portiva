@@ -93,7 +93,7 @@ export default function SignUpPage() {
               type="text"
               required
               autoComplete="name"
-              placeholder="John Doe"
+              placeholder="Your name"
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
             />
           </div>
