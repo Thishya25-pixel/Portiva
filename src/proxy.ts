@@ -7,13 +7,15 @@ export async function proxy(req: NextRequest) {
 
   const MAIN_DOMAIN = "portiva.online";
 
-  // Ignore static assets, internal routes, dashboard, and admin paths
+  // 1. Skip system, static assets, and primary app routes
   if (
     url.pathname.startsWith("/_next") ||
     url.pathname.startsWith("/api") ||
     url.pathname.startsWith("/admin") ||
     url.pathname.startsWith("/dashboard") ||
     url.pathname.startsWith("/editor") ||
+    url.pathname.startsWith("/login") ||
+    url.pathname.startsWith("/auth") ||
     url.pathname.includes(".")
   ) {
     return NextResponse.next();
@@ -31,10 +33,15 @@ export async function proxy(req: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // 1. Subdomain Routing (e.g. rahul.portiva.online)
-  if (hostname.endsWith(`.${MAIN_DOMAIN}`) && !hostname.startsWith("www.")) {
+  // 2. Handle Wildcard Subdomains (e.g. mytrail.portiva.online)
+  if (
+    hostname.endsWith(`.${MAIN_DOMAIN}`) &&
+    !hostname.startsWith("www.") &&
+    hostname !== MAIN_DOMAIN
+  ) {
     const subdomain = hostname.replace(`.${MAIN_DOMAIN}`, "");
 
+    // Fetch site matching custom_subdomain
     const { data: site } = await supabase
       .from("websites")
       .select("slug, profiles:user_id(is_pro, pro_until, trial_ends_at)")
@@ -48,37 +55,17 @@ export async function proxy(req: NextRequest) {
           (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
     );
 
+    // If site exists and user is Pro, rewrite to public portfolio route
     if (site && isPro) {
-      return NextResponse.rewrite(new URL(`/${site.slug}${url.pathname}`, req.url));
-    }
-  }
-
-  // 2. Custom Domain Routing (e.g. rahul.com)
-  if (!hostname.includes(MAIN_DOMAIN) && !hostname.includes("localhost")) {
-    const cleanDomain = hostname.replace("www.", "");
-
-    const { data: site } = await supabase
-      .from("websites")
-      .select("slug, profiles:user_id(is_pro, pro_until, trial_ends_at)")
-      .eq("custom_domain", cleanDomain)
-      .maybeSingle();
-
-    const profile = (site as any)?.profiles;
-    const isPro = Boolean(
-      profile?.is_pro &&
-        ((profile.pro_until && new Date(profile.pro_until) > new Date()) ||
-          (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
-    );
-
-    if (site && isPro) {
-      return NextResponse.rewrite(new URL(`/${site.slug}${url.pathname}`, req.url));
+      const rewriteUrl = new URL(`/${site.slug}${url.pathname}`, req.url);
+      // Strip authentication headers so auth middleware doesn't trigger a login redirect
+      return NextResponse.rewrite(rewriteUrl);
     }
   }
 
   return NextResponse.next();
 }
 
-// Add default export for edge runtime bundler compatibility
 export default proxy;
 
 export const config = {
