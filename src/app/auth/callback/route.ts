@@ -1,4 +1,3 @@
-// src/app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -9,7 +8,12 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
-  const next = searchParams.get("next") || "/dashboard";
+  
+  // If type is recovery (password reset), force redirect to /reset-password
+  let next = searchParams.get("next");
+  if (!next) {
+    next = type === "recovery" ? "/reset-password" : "/dashboard";
+  }
 
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!;
