@@ -1,4 +1,3 @@
-// src/components/Footer.tsx
 "use client";
 
 import { usePathname } from "next/navigation";
@@ -7,17 +6,25 @@ import Link from "next/link";
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on editor and individual site slug pages
-  const isPublicSite = pathname !== "/" && 
-                       !pathname.startsWith("/dashboard") && 
-                       !pathname.startsWith("/login") && 
-                       !pathname.startsWith("/signup") && 
-                       !pathname.startsWith("/terms") && 
-                       !pathname.startsWith("/privacy") && 
-                       !pathname.startsWith("/refund") && 
-                       !pathname.startsWith("/contact");
+  // Define the exact main marketing / app routes where the Portiva site footer SHOULD render
+  const APP_ROUTES = [
+    "/",
+    "/login",
+    "/signup",
+    "/dashboard",
+    "/terms",
+    "/privacy",
+    "/refund",
+    "/contact",
+  ];
 
-  if (pathname.startsWith("/editor") || isPublicSite) {
+  // Check if current route is an official Portiva platform route
+  const isAppRoute = APP_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // If the user is on an editor page OR any public user site ([slug] / wildcard subdomain), hide the main app footer
+  if (pathname.startsWith("/editor") || !isAppRoute) {
     return null;
   }
 
@@ -28,10 +35,18 @@ export default function Footer() {
           © {new Date().getFullYear()} Portiva. All rights reserved.
         </p>
         <div className="flex flex-wrap justify-center gap-6 text-sm">
-          <Link href="/terms" className="hover:text-white transition">Terms</Link>
-          <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
-          <Link href="/refund" className="hover:text-white transition">Refund Policy</Link>
-          <Link href="/contact" className="hover:text-white transition">Contact Us</Link>
+          <Link href="/terms" className="hover:text-white transition">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-white transition">
+            Privacy
+          </Link>
+          <Link href="/refund" className="hover:text-white transition">
+            Refund Policy
+          </Link>
+          <Link href="/contact" className="hover:text-white transition">
+            Contact Us
+          </Link>
         </div>
       </div>
     </footer>
