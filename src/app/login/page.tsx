@@ -1,5 +1,5 @@
 "use client";
-
+import Footer from "@/components/Footer";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";

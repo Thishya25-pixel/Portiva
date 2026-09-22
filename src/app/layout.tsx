@@ -1,7 +1,5 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.portiva.online"),
@@ -63,7 +61,6 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased bg-[#090d16] text-white">
         {children}
-        <Footer />
       </body>
     </html>
   );

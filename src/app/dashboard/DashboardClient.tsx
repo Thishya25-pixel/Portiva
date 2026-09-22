@@ -1,4 +1,5 @@
 "use client";
+import Footer from "@/components/Footer";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -148,7 +149,9 @@ export default function DashboardClient({
             </div>
           )}
         </div>
+        
       </main>
+      <Footer />
 
       {/* Create / Upgrade Modal */}
       <CreateWebsiteModal
