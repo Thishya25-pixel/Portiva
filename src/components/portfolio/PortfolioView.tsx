@@ -47,12 +47,17 @@ export interface ContactContent {
   resume: string;
 }
 
+export interface MediaContent {
+  gallery_images?: string[];
+}
+
 export interface PortfolioContent {
   hero: HeroContent;
   about: AboutContent;
   projects: ProjectsContent;
   skills: SkillsContent;
   contact: ContactContent;
+  media?: MediaContent;
 }
 
 /** Fills in every field so the renderer never has to guard for undefined. */
@@ -98,6 +103,11 @@ export function normalizeContent(
       website: c.contact?.website ?? "",
       twitter: c.contact?.twitter ?? "",
       resume: c.contact?.resume ?? "",
+    },
+    media: {
+      gallery_images: Array.isArray(c.media?.gallery_images)
+        ? c.media.gallery_images.filter(Boolean)
+        : [],
     },
   };
 }
@@ -163,7 +173,7 @@ export default function PortfolioView({
 }: PortfolioViewProps) {
   const t = resolveTheme(theme);
   const isPreview = variant === "preview";
-  const { hero, about, projects, skills, contact } = content;
+  const { hero, about, projects, skills, contact, media } = content;
 
   const links = [
     contact.email && {
@@ -209,10 +219,13 @@ export default function PortfolioView({
     glyph: string;
   }[];
 
+  const galleryImages = media?.gallery_images || [];
+
   const nav = [
     about.bio && { id: "about", label: about.heading },
     projects.items.length > 0 && { id: "projects", label: projects.heading },
     skills.list.length > 0 && { id: "skills", label: skills.heading },
+    galleryImages.length > 0 && { id: "gallery", label: "Gallery" },
     links.length > 0 && { id: "contact", label: contact.heading },
   ].filter(Boolean) as { id: string; label: string }[];
 
@@ -409,6 +422,29 @@ export default function PortfolioView({
           </Section>
         )}
 
+        {/* Gallery Showcase Section */}
+        {galleryImages.length > 0 && (
+          <Section id="gallery" heading="Gallery">
+            <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [scrollbar-color:rgba(99,102,241,0.3)_transparent] [scrollbar-width:thin]">
+              {galleryImages.map((url, i) => (
+                <div
+                  key={`${url}-${i}`}
+                  className="group h-48 w-72 shrink-0 snap-center overflow-hidden rounded-[var(--p-radius-lg)] border border-[var(--p-border)] bg-[var(--p-surface)] sm:w-80"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Gallery item ${i + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
         {/* Contact */}
         {links.length > 0 && (
           <Section id="contact" heading={contact.heading}>
@@ -440,6 +476,7 @@ export default function PortfolioView({
         )}
       </main>
 
+      {/* Footer is rendered AT THE BOTTOM */}
       <footer
         className="mt-6 border-t border-[var(--p-border)] px-5 py-8 text-center text-xs text-[var(--p-muted)] sm:px-6"
         style={{ borderColor: "var(--p-border)" }}

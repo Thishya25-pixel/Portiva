@@ -4,9 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import CreateWebsiteModal from "@/app/dashboard/CreateWebsiteModal";
 import PortfolioView, {
   normalizeContent,
 } from "@/components/portfolio/PortfolioView";
+import PortfolioMediaFrame, {
+  normalizeMedia,
+  type PortfolioMedia,
+} from "@/components/portfolio/PortfolioMediaFrame";
+import ImageUpload from "@/components/editor/ImageUpload";
 import {
   COLOR_PRESETS,
   FONT_OPTIONS,
@@ -35,7 +41,7 @@ interface Website {
   theme_config?: ThemeConfig | null;
 }
 
-type SectionId = "hero" | "about" | "projects" | "skills" | "contact";
+type SectionId = "hero" | "about" | "projects" | "skills" | "contact" | "media";
 type TabId = SectionId | "design";
 
 interface ProjectItem {
@@ -90,6 +96,7 @@ function buildInitialState(website: Website, c: Record<string, any>) {
       twitter: c.contact?.twitter ?? "",
       resume: c.contact?.resume ?? "",
     },
+    media: normalizeMedia(c.media),
     theme: {
       preset: website.theme_config?.preset,
       primaryColor: website.theme_config?.primaryColor ?? "#6366f1",
@@ -171,6 +178,17 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: "media",
+    label: "Images",
+    icon: (
+      <>
+        <rect x="4" y="5" width="16" height="14" rx="2" />
+        <circle cx="9" cy="10" r="1.5" />
+        <path d="M4 17l5-4 4 3 3-2 4 3" />
+      </>
+    ),
+  },
+  {
     id: "design",
     label: "Design",
     icon: (
@@ -241,18 +259,27 @@ function OptionCard({
 /* Editor                                                              */
 /* ------------------------------------------------------------------ */
 
+interface EditorClientProps {
+  website: Website;
+  initialContent: Record<string, any>;
+  isPro: boolean;
+  userId?: string;
+  onOpenUpgradeModal?: () => void;
+  upgradeHref?: string;
+}
+
 export default function EditorClient({
   website,
   initialContent,
-}: {
-  website: Website;
-  initialContent: Record<string, any>;
-}) {
+  isPro,
+  userId,
+  onOpenUpgradeModal,
+  upgradeHref = "/pricing",
+}: EditorClientProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const init = useMemo(
     () => buildInitialState(website, initialContent ?? {}),
-    // Intentionally computed once: this is the baseline we diff against.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -261,12 +288,14 @@ export default function EditorClient({
   const [pane, setPane] = useState<"edit" | "preview">("edit");
   const [device, setDevice] = useState<"phone" | "desktop">("desktop");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [hero, setHero] = useState(init.hero);
   const [about, setAbout] = useState(init.about);
   const [projects, setProjects] = useState(init.projects);
   const [skills, setSkills] = useState(init.skills);
   const [contact, setContact] = useState(init.contact);
+  const [media, setMedia] = useState<PortfolioMedia>(init.media);
   const [theme, setTheme] = useState<ThemeConfig>(init.theme);
 
   const [isPublished, setIsPublished] = useState(website.published);
@@ -293,6 +322,11 @@ export default function EditorClient({
     [],
   );
 
+  const openUpgrade = useCallback(() => {
+    if (onOpenUpgradeModal) onOpenUpgradeModal();
+    else setUpgradeOpen(true);
+  }, [onOpenUpgradeModal]);
+
   const skillList = useMemo(() => parseList(skills.input), [skills.input]);
 
   /* ---------------- payloads + change tracking ---------------- */
@@ -304,8 +338,9 @@ export default function EditorClient({
       projects,
       skills: { heading: skills.heading, list: skillList },
       contact,
+      media,
     }),
-    [hero, about, projects, skills.heading, skillList, contact],
+    [hero, about, projects, skills.heading, skillList, contact, media],
   );
 
   const [baseline, setBaseline] = useState<Record<string, string>>(() => ({
@@ -317,6 +352,7 @@ export default function EditorClient({
       list: parseList(init.skills.input),
     }),
     contact: JSON.stringify(init.contact),
+    media: JSON.stringify(init.media),
     design: JSON.stringify(init.theme),
   }));
 
@@ -327,6 +363,7 @@ export default function EditorClient({
       projects: JSON.stringify(payloads.projects) !== baseline.projects,
       skills: JSON.stringify(payloads.skills) !== baseline.skills,
       contact: JSON.stringify(payloads.contact) !== baseline.contact,
+      media: JSON.stringify(payloads.media) !== baseline.media,
       design: JSON.stringify(theme) !== baseline.design,
     };
     return map;
@@ -394,7 +431,7 @@ export default function EditorClient({
     [busy, notify, payloads, router, supabase, theme, website.id],
   );
 
-  // Cmd/Ctrl + S saves everything that changed.
+  // Cmd/Ctrl + S
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
@@ -406,7 +443,7 @@ export default function EditorClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [saveTabs, dirtyTabs]);
 
-  // Don't let unsaved work disappear on a stray tab close.
+  // Unsaved changes guard
   useEffect(() => {
     if (dirtyTabs.length === 0) return;
     const onLeave = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -455,20 +492,25 @@ export default function EditorClient({
 
   /* ---------------- live preview data ---------------- */
 
-  const previewContent = useMemo(
-    () =>
-      normalizeContent(
-        {
-          hero,
-          about,
-          projects,
-          skills: { heading: skills.heading, list: skillList },
-          contact,
-        },
-        website.name,
-      ),
-    [hero, about, projects, skills.heading, skillList, contact, website.name],
-  );
+  const previewContent = useMemo(() => {
+    const base = normalizeContent(
+      {
+        hero,
+        about,
+        projects,
+        skills: { heading: skills.heading, list: skillList },
+        contact,
+      },
+      website.name,
+    );
+    return {
+      ...base,
+      hero: {
+        ...base.hero,
+        avatarUrl: media.profile_image_url || base.hero.avatarUrl,
+      },
+    };
+  }, [hero, about, projects, skills.heading, skillList, contact, media.profile_image_url, website.name]);
 
   const activePreset = THEME_PRESETS.find((p) => {
     const c = p.config;
@@ -483,6 +525,9 @@ export default function EditorClient({
 
   const updateTheme = (patch: Partial<ThemeConfig>) =>
     setTheme((prev) => ({ ...prev, ...patch }));
+
+  const patchMedia = (patch: Partial<PortfolioMedia>) =>
+    setMedia((prev) => ({ ...prev, ...patch }));
 
   /* ---------------- project helpers ---------------- */
 
@@ -508,8 +553,6 @@ export default function EditorClient({
       ...prev,
       items: prev.items.filter((_: ProjectItem, i: number) => i !== index),
     }));
-
-  /* ---------------- render ---------------- */
 
   const saveLabel = busy
     ? "Saving…"
@@ -806,7 +849,7 @@ export default function EditorClient({
 
                 <Field
                   label="Photo URL"
-                  hint="Any public image link. Square images look best."
+                  hint="Any public image link. A photo uploaded in the Images tab takes priority."
                 >
                   <input
                     className={inputClass}
@@ -1083,6 +1126,119 @@ export default function EditorClient({
               </div>
             )}
 
+            {tab === "media" && (
+              <div className="space-y-7">
+                {/* Profile avatar */}
+                <section className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Profile avatar</p>
+                    <p className="text-xs text-slate-500">
+                      A square photo of you. It's cropped to a circle on your site.
+                    </p>
+                  </div>
+                  <ImageUpload
+                    mode="avatar"
+                    value={media.profile_image_url}
+                    onChange={(url) => patchMedia({ profile_image_url: url })}
+                    isPro={isPro}
+                    onOpenUpgradeModal={openUpgrade}
+                  />
+                </section>
+
+                {/* Hero background */}
+                <section className="space-y-3 border-t border-white/10 pt-6">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">
+                      Custom hero background
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      A wide image behind your intro. Dark photos work best.
+                    </p>
+                  </div>
+                  <ImageUpload
+                    mode="background"
+                    value={media.background_image_url}
+                    onChange={(url) => patchMedia({ background_image_url: url })}
+                    isPro={isPro}
+                    onOpenUpgradeModal={openUpgrade}
+                  />
+
+                  {media.background_image_url && (
+                    <Field
+                      label="Dark overlay"
+                      hint="Raise this if your text is hard to read over the image."
+                      counter={`${media.background_overlay}%`}
+                    >
+                      <input
+                        type="range"
+                        min={0}
+                        max={90}
+                        step={5}
+                        value={media.background_overlay}
+                        onChange={(e) =>
+                          patchMedia({ background_overlay: Number(e.target.value) })
+                        }
+                        className="h-11 w-full cursor-pointer accent-indigo-500"
+                      />
+                    </Field>
+                  )}
+                </section>
+
+                {/* Gallery */}
+                <section className="space-y-3 border-t border-white/10 pt-6">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">
+                      Portfolio showcase gallery
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Shown as a swipeable strip on your site. Up to 12 images.
+                    </p>
+                  </div>
+
+                  <ImageUpload
+                    mode="gallery"
+                    value={media.gallery_images}
+                    onChange={(urls) => patchMedia({ gallery_images: urls })}
+                    isPro={isPro}
+                    onOpenUpgradeModal={openUpgrade}
+                  />
+
+                  {media.gallery_images.length > 0 && (
+                    <div className="scrollbar-none flex gap-2.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                      {media.gallery_images.map((url, i) => (
+                        <div
+                          key={`${url}-${i}`}
+                          className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`Gallery image ${i + 1}`}
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Delete gallery image ${i + 1}`}
+                            onClick={() =>
+                              patchMedia({
+                                gallery_images: media.gallery_images.filter(
+                                  (_, j) => j !== i,
+                                ),
+                              })
+                            }
+                            className="absolute inset-x-0 bottom-0 bg-black/70 py-1.5 text-[11px] font-semibold text-rose-300 transition hover:bg-rose-600 hover:text-white focus:outline-none focus-visible:bg-rose-600 focus-visible:text-white"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+
             {tab === "design" && (
               <div className="space-y-7">
                 <div className="space-y-3">
@@ -1344,14 +1500,16 @@ export default function EditorClient({
                 device === "phone" ? "lg:max-w-[420px]" : "lg:max-w-4xl"
               }`}
             >
-              <PortfolioView
-                name={website.name}
-                category={website.category}
-                content={previewContent}
-                theme={theme}
-                variant="preview"
-                showBranding
-              />
+              <PortfolioMediaFrame theme={theme} media={media}>
+                <PortfolioView
+                  name={website.name}
+                  category={website.category}
+                  content={previewContent}
+                  theme={theme}
+                  variant="preview"
+                  showBranding
+                />
+              </PortfolioMediaFrame>
             </div>
 
             {!isPublished && (
@@ -1363,6 +1521,14 @@ export default function EditorClient({
           </div>
         </main>
       </div>
+
+      {/* ---------- UPI payment modal ---------- */}
+      <CreateWebsiteModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        userId={userId || ""}
+        initialStep="upi"
+      />
 
       <style jsx global>{`
         .scrollbar-none::-webkit-scrollbar {

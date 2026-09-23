@@ -1,4 +1,3 @@
-import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EditorClient from "./EditorClient";
 
@@ -10,42 +9,48 @@ export default async function EditorPage({
   const { websiteId } = await params;
   const supabase = await createClient();
 
-  // 1. Authenticate User
   const {
     data: { user },
-    error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError || !user) {
-    redirect("/login");
-  }
+  // Fetch profile to evaluate active Pro or Trial status
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user?.id)
+    .single();
 
-  // 2. Fetch Website Details
-  const { data: website, error: siteError } = await supabase
+  const isPro = Boolean(
+    profile?.is_pro &&
+      ((profile?.pro_until && new Date(profile.pro_until) > new Date()) ||
+        (profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date()))
+  );
+
+  const { data: website } = await supabase
     .from("websites")
     .select("*")
     .eq("id", websiteId)
-    .eq("user_id", user.id)
     .single();
 
-  if (siteError || !website) {
-    notFound();
-  }
-
-  // 3. Fetch All Content Sections for this Website
-  const { data: sections } = await supabase
+  const { data: contentRows } = await supabase
     .from("website_content")
-    .select("section, content")
+    .select("*")
     .eq("website_id", websiteId);
 
-  // 4. Map Array of Sections into a Clean Key-Value Object
-  // e.g., { hero: { title: "..." }, about: { bio: "..." } }
-  const initialContent: Record<string, any> = {};
-  if (sections) {
-    sections.forEach((item) => {
-      initialContent[item.section] = item.content;
-    });
-  }
+  const initialContent = (contentRows || []).reduce(
+    (acc: Record<string, any>, row: { section: string; content: any }) => {
+      acc[row.section] = row.content;
+      return acc;
+    },
+    {} as Record<string, any>
+  );
 
-  return <EditorClient website={website} initialContent={initialContent} />;
+  return (
+    <EditorClient
+      website={website}
+      initialContent={initialContent}
+      isPro={isPro}
+      userId={user?.id}
+    />
+  );
 }

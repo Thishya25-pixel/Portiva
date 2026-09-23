@@ -4,6 +4,9 @@ import { createClient as createSupabaseDirect } from "@supabase/supabase-js";
 import PortfolioView, {
   normalizeContent,
 } from "@/components/portfolio/PortfolioView";
+import PortfolioMediaFrame, {
+  normalizeMedia,
+} from "@/components/portfolio/PortfolioMediaFrame";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -56,7 +59,21 @@ async function loadWebsite(slug: string) {
     raw[row.section] = row.content;
   }
 
-  return { website, profile, content: normalizeContent(raw, website.name) };
+  // 4. Media (avatar / hero background / gallery) lives in its own "media" section.
+  const media = normalizeMedia(raw.media);
+  const base = normalizeContent(raw, website.name);
+
+  // An uploaded avatar takes priority over the pasted "Photo URL". Applying it here
+  // means PortfolioView, OG tags and JSON-LD all pick it up.
+  const content = {
+    ...base,
+    hero: {
+      ...base.hero,
+      avatarUrl: media.profile_image_url || base.hero.avatarUrl,
+    },
+  };
+
+  return { website, profile, content, media };
 }
 
 export async function generateMetadata({
@@ -72,12 +89,13 @@ export async function generateMetadata({
     };
   }
 
-  const { website, content } = result;
+  const { website, content, media } = result;
   const description =
     content.hero.subtitle ||
     content.about.bio.slice(0, 160) ||
     `${website.name} — ${website.category}. Portfolio built on Portiva.`;
   const url = `https://www.portiva.online/${website.slug}`;
+  const ogImage = content.hero.avatarUrl || media.background_image_url;
 
   return {
     title: `${website.name} — ${website.category}`,
@@ -89,7 +107,7 @@ export async function generateMetadata({
       description,
       url,
       siteName: website.name,
-      images: content.hero.avatarUrl ? [content.hero.avatarUrl] : undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
     twitter: {
       card: "summary_large_image",
@@ -105,7 +123,7 @@ export default async function PublicWebsitePage({ params }: PageProps) {
 
   if (!result) notFound();
 
-  const { website, profile, content } = result;
+  const { website, profile, content, media } = result;
 
   // Validate active Pro status against Expiration Date / Active Trial
   const isPro = Boolean(
@@ -143,15 +161,17 @@ export default async function PublicWebsitePage({ params }: PageProps) {
         }}
       />
 
-      <PortfolioView
-        name={website.name}
-        category={website.category}
-        content={content}
-        theme={website.theme_config}
-        showBranding={!isPro}
-        variant="live"
-        className="min-h-screen scroll-smooth"
-      />
+      <PortfolioMediaFrame theme={website.theme_config} media={media}>
+        <PortfolioView
+          name={website.name}
+          category={website.category}
+          content={content}
+          theme={website.theme_config}
+          showBranding={!isPro}
+          variant="live"
+          className="min-h-screen scroll-smooth"
+        />
+      </PortfolioMediaFrame>
     </>
   );
 }
