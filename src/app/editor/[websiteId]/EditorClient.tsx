@@ -88,6 +88,8 @@ function buildInitialState(website: Website, c: Record<string, any>) {
     },
     contact: {
       heading: c.contact?.heading || "Get in touch",
+      whatsapp: c.contact?.whatsapp ?? "",   // <--- Added
+  instagram: c.contact?.instagram ?? "",
       message: c.contact?.message ?? "",
       email: c.contact?.email ?? "",
       linkedin: c.contact?.linkedin ?? "",
@@ -1087,6 +1089,25 @@ export default function EditorClient({
                     onChange={(e) => setContact({ ...contact, message: e.target.value })}
                   />
                 </Field>
+                <Field label="WhatsApp Number or Link" hint="e.g. 918088477123 or https://wa.me/918088477123">
+      <input
+        type="text"
+        className={inputClass}
+        placeholder="918088477123"
+        value={contact.whatsapp}
+        onChange={(e) => setContact({ ...contact, whatsapp: e.target.value })}
+      />
+    </Field>
+
+    <Field label="Instagram Profile Link" hint="e.g. cut_well_salon_tumkur">
+      <input
+        type="text"
+        className={inputClass}
+        placeholder="https://instagram.com/cut_well_salon_tumkur"
+        value={contact.instagram}
+        onChange={(e) => setContact({ ...contact, instagram: e.target.value })}
+      />
+    </Field>
 
                 <Field label="Email">
                   <input
